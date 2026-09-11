@@ -57,6 +57,9 @@ async function handleCopy() {
         <div v-if="message.error" class="error-msg">
           ⚠️ {{ message.error }}
         </div>
+
+        <!-- 用户主动停止(不是错误,用弱化样式) -->
+        <div v-if="message.stopped" class="stopped-msg">⏹ 已停止生成</div>
       </div>
 
       <div v-if="message.role === 'assistant' && message.content" class="actions">
@@ -137,6 +140,12 @@ async function handleCopy() {
 
 .bubble.error {
   border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+}
+
+.stopped-msg {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .content {

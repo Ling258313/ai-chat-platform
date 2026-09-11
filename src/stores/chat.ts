@@ -6,6 +6,9 @@ import { useSettingsStore } from '@/stores/settings'
 
 const STORAGE_KEY = 'ai-chat-conversations'
 
+/** 流式请求空闲超时(毫秒):这么久没有任何新分片就中断,避免永久卡在"正在输入" */
+const IDLE_TIMEOUT_MS = 30_000
+
 function generateId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }
@@ -26,6 +29,39 @@ export const useChatStore = defineStore('chat', () => {
   const conversations = ref<Conversation[]>(loadConversations())
   const activeConversationId = ref<string | null>(null)
   const isSending = ref(false)
+
+  /** 当前流式请求的中断控制器 */
+  let abortController: AbortController | null = null
+  /** 空闲超时定时器 */
+  let idleTimer: ReturnType<typeof setTimeout> | null = null
+  /** 本次中断是否由超时引起(用于给不同的提示文案) */
+  let abortedByTimeout = false
+
+  function clearIdleTimer() {
+    if (idleTimer !== null) {
+      clearTimeout(idleTimer)
+      idleTimer = null
+    }
+  }
+
+  /**
+   * 重置空闲计时。每收到一个分片就重置,
+   * 所以只有"长时间完全没有新内容"才算超时,持续输出的长回复不会被误杀。
+   */
+  function armIdleTimer() {
+    clearIdleTimer()
+    idleTimer = setTimeout(() => {
+      abortedByTimeout = true
+      abortController?.abort()
+    }, IDLE_TIMEOUT_MS)
+  }
+
+  /** 用户主动停止生成(保留已收到的内容) */
+  function stopGeneration() {
+    if (!abortController) return
+    abortedByTimeout = false
+    abortController.abort()
+  }
 
   // 持久化
   watch(
@@ -147,6 +183,11 @@ export const useChatStore = defineStore('chat', () => {
 
     isSending.value = true
 
+    // 建立本次请求的中断控制:"停止生成"和空闲超时都通过它中断
+    abortController = new AbortController()
+    abortedByTimeout = false
+    armIdleTimer()
+
     const settings = useSettingsStore().settings
 
     try {
@@ -168,14 +209,17 @@ export const useChatStore = defineStore('chat', () => {
         }
       }
 
-      await streamChat(
-        settings.apiBaseUrl,
-        settings.apiKey,
-        settings.model || 'deepseek-v4-flash',
-        history,
-        settings.temperature,
-        {
+      await streamChat({
+        apiBaseUrl: settings.apiBaseUrl,
+        apiKey: settings.apiKey,
+        model: settings.model || 'deepseek-v4-flash',
+        messages: history,
+        temperature: settings.temperature,
+        signal: abortController.signal,
+        callbacks: {
           onChunk: (delta) => {
+            // 有内容到达就重置空闲计时
+            armIdleTimer()
             updateMessage(
               assistantMsg.id,
               { content: assistantMsg.content + delta },
@@ -192,8 +236,27 @@ export const useChatStore = defineStore('chat', () => {
               conversationId,
             )
           },
+          onAbort: () => {
+            if (abortedByTimeout) {
+              updateMessage(
+                assistantMsg.id,
+                {
+                  isStreaming: false,
+                  error: `等待响应超时,已中断(${IDLE_TIMEOUT_MS / 1000} 秒内没有新内容)`,
+                },
+                conversationId,
+              )
+            } else {
+              // 主动停止:保留已收到的部分内容,标记为已停止(不是错误)
+              updateMessage(
+                assistantMsg.id,
+                { isStreaming: false, stopped: true },
+                conversationId,
+              )
+            }
+          },
         },
-      )
+      })
     } catch (error) {
       updateMessage(
         assistantMsg.id,
@@ -204,6 +267,8 @@ export const useChatStore = defineStore('chat', () => {
         conversationId,
       )
     } finally {
+      clearIdleTimer()
+      abortController = null
       isSending.value = false
     }
   }
@@ -230,6 +295,7 @@ export const useChatStore = defineStore('chat', () => {
     addMessage,
     updateMessage,
     sendMessage,
+    stopGeneration,
     resetStore,
   }
 })

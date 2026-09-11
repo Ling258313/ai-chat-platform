@@ -11,6 +11,8 @@ export interface Message {
   isStreaming?: boolean
   /** 错误信息 */
   error?: string
+  /** 是否被用户主动停止生成(与 error 区分:停止不是错误) */
+  stopped?: boolean
 }
 
 /** 会话 */
@@ -49,6 +51,8 @@ export interface StreamCallbacks {
   onChunk: (delta: string) => void
   onDone?: () => void
   onError?: (error: Error) => void
+  /** 请求被中断(用户点击停止 / 空闲超时)时触发,与 onError 区分开 */
+  onAbort?: () => void
 }
 
 /** 语音识别事件回调 */

@@ -130,13 +130,23 @@ onUnmounted(() => {
         @keydown="handleKeydown"
       ></textarea>
 
+      <!-- 流式输出中:同一个位置变成"停止"按钮,让用户能中断 -->
       <button
+        v-if="chatStore.isSending"
+        class="send-btn stop"
+        title="停止生成"
+        @click="chatStore.stopGeneration()"
+      >
+        ⏹ 停止
+      </button>
+      <button
+        v-else
         class="send-btn"
-        :class="{ disabled: !text.trim() || chatStore.isSending }"
-        :disabled="!text.trim() || chatStore.isSending"
+        :class="{ disabled: !text.trim() }"
+        :disabled="!text.trim()"
         @click="handleSend"
       >
-        {{ chatStore.isSending ? '…' : '发送' }}
+        发送
       </button>
     </div>
 
@@ -257,6 +267,15 @@ onUnmounted(() => {
 .send-btn.disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* 流式输出中的"停止"按钮:用危险色区分于发送 */
+.send-btn.stop {
+  background: var(--danger);
+}
+
+.send-btn.stop:hover:not(:disabled) {
+  background: #dc2626;
 }
 
 .tip {

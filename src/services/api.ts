@@ -20,22 +20,31 @@ interface SSEChunk {
 }
 
 /**
- * 发送流式对话请求
- * @param apiBaseUrl API 地址,如 https://api.openai.com/v1
- * @param apiKey API Key
- * @param model 模型名称
- * @param messages 消息历史
- * @param temperature 温度
- * @param callbacks 流式回调
+ * streamChat 的参数。
+ * 用对象而不是位置参数:字段多、可选参数(signal)夹在中间时,
+ * 调用处一眼能看出传的是什么,加字段也不会影响已有调用。
  */
-export async function streamChat(
-  apiBaseUrl: string,
-  apiKey: string,
-  model: string,
-  messages: Message[],
-  temperature: number,
-  callbacks: StreamCallbacks,
-): Promise<void> {
+export interface StreamChatOptions {
+  /** API 地址,如 https://api.openai.com/v1 */
+  apiBaseUrl: string
+  apiKey: string
+  model: string
+  messages: Message[]
+  temperature: number
+  /** 用于中断请求(用户点击停止 / 空闲超时) */
+  signal?: AbortSignal
+  callbacks: StreamCallbacks
+}
+
+/** 判断异常是否来自"主动中断"(AbortController) */
+function isAbortError(err: unknown): boolean {
+  return err instanceof Error && err.name === 'AbortError'
+}
+
+/** 发送流式对话请求 */
+export async function streamChat(options: StreamChatOptions): Promise<void> {
+  const { apiBaseUrl, apiKey, model, messages, temperature, signal, callbacks } = options
+
   // 去掉流式标记,只保留用户/助手消息(排除 system 内部消息)
   const chatMessages = messages
     .filter((m) => m.role !== 'system' || m.content.trim() !== '')
@@ -71,8 +80,14 @@ export async function streamChat(
       method: 'POST',
       headers,
       body: JSON.stringify(body),
+      signal,
     })
   } catch (err) {
+    // 请求发出前/等待响应期间被中断
+    if (isAbortError(err)) {
+      callbacks.onAbort?.()
+      return
+    }
     const error = err instanceof Error ? err : new Error('网络请求失败')
     callbacks.onError?.(new Error(`网络错误:${error.message}`))
     return
@@ -154,6 +169,11 @@ export async function streamChat(
 
     callbacks.onDone?.()
   } catch (err) {
+    // 读取过程中被中断(abort 会让挂起的 read() 直接 reject)
+    if (isAbortError(err)) {
+      callbacks.onAbort?.()
+      return
+    }
     const error = err instanceof Error ? err : new Error('流式读取失败')
     callbacks.onError?.(error)
   } finally {
