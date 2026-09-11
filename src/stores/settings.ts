@@ -6,7 +6,11 @@ const STORAGE_KEY = 'ai-chat-settings'
 
 const DEFAULT_SETTINGS: Settings = {
   apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? '',
-  apiKey: import.meta.env.VITE_API_KEY ?? '',
+  // 安全:仅开发模式允许用环境变量里的 Key 作为默认值。
+  // import.meta.env.DEV 在构建时会被替换成字面量 false,整个分支随之被摇掉,
+  // 所以生产产物里既没有这个分支、也不会内联 Key。
+  // 配套约定:密钥放 .env.development.local(仅 dev 加载),不要放 .env.local(所有模式都加载)。
+  apiKey: import.meta.env.DEV ? (import.meta.env.VITE_API_KEY ?? '') : '',
   model: import.meta.env.VITE_MODEL ?? 'deepseek-v4-flash',
   systemPrompt: '你是一个乐于助人的 AI 助手,请用简洁友好的方式回答问题。',
   temperature: 0.7,

@@ -78,10 +78,8 @@ export const useChatStore = defineStore('chat', () => {
     activeConversationId.value = null
   }
 
-  function addMessage(role: Message['role'], content: string): Message {
-    const conv = activeConversation.value
-    if (!conv) throw new Error('没有活跃会话')
-
+  /** 向指定会话追加消息(内部使用,不依赖 activeConversationId) */
+  function addMessageTo(conv: Conversation, role: Message['role'], content: string): Message {
     const message: Message = {
       id: generateId(),
       role,
@@ -97,8 +95,24 @@ export const useChatStore = defineStore('chat', () => {
     return message
   }
 
-  function updateMessage(id: string, patch: Partial<Message>) {
+  function addMessage(role: Message['role'], content: string): Message {
     const conv = activeConversation.value
+    if (!conv) throw new Error('没有活跃会话')
+    return addMessageTo(conv, role, content)
+  }
+
+  function findConversation(id: string): Conversation | undefined {
+    return conversations.value.find((c) => c.id === id)
+  }
+
+  /**
+   * 更新某条消息
+   * @param conversationId 目标会话 id。
+   *   流式回调必须传:用户在流式输出期间可能切换会话,
+   *   若仍用 activeConversation 定位,分片会被写到别的会话、甚至静默丢弃。
+   */
+  function updateMessage(id: string, patch: Partial<Message>, conversationId?: string) {
+    const conv = conversationId ? findConversation(conversationId) : activeConversation.value
     if (!conv) return
     const msg = conv.messages.find((m) => m.id === id)
     if (msg) {
@@ -118,11 +132,17 @@ export const useChatStore = defineStore('chat', () => {
       createConversation()
     }
 
+    // 锁定本次请求的目标会话:流式回调期间用户可以切走,
+    // 后续所有写入都以这里捕获的会话为准,而不是当时的 activeConversation。
+    const conv = activeConversation.value
+    if (!conv) return
+    const conversationId = conv.id
+
     // 添加用户消息
-    const userMsg = addMessage('user', content)
+    const userMsg = addMessageTo(conv, 'user', content)
 
     // 创建占位的 AI 消息
-    const assistantMsg = addMessage('assistant', '')
+    const assistantMsg = addMessageTo(conv, 'assistant', '')
     assistantMsg.isStreaming = true
 
     isSending.value = true
@@ -140,14 +160,11 @@ export const useChatStore = defineStore('chat', () => {
           createdAt: Date.now(),
         })
       }
-      // 取当前会话所有消息(去掉正在流式的空消息)
-      const conv = activeConversation.value
-      if (conv) {
-        for (const m of conv.messages) {
-          if (m.id === assistantMsg.id && m.content === '') continue
-          if (m.id === userMsg.id || m.content.trim() !== '') {
-            history.push(m)
-          }
+      // 取本次请求所属会话的所有消息(去掉正在流式的空占位消息)
+      for (const m of conv.messages) {
+        if (m.id === assistantMsg.id && m.content === '') continue
+        if (m.id === userMsg.id || m.content.trim() !== '') {
+          history.push(m)
         }
       }
 
@@ -159,26 +176,33 @@ export const useChatStore = defineStore('chat', () => {
         settings.temperature,
         {
           onChunk: (delta) => {
-            updateMessage(assistantMsg.id, {
-              content: assistantMsg.content + delta,
-            })
+            updateMessage(
+              assistantMsg.id,
+              { content: assistantMsg.content + delta },
+              conversationId,
+            )
           },
           onDone: () => {
-            updateMessage(assistantMsg.id, { isStreaming: false })
+            updateMessage(assistantMsg.id, { isStreaming: false }, conversationId)
           },
           onError: (error) => {
-            updateMessage(assistantMsg.id, {
-              isStreaming: false,
-              error: error.message,
-            })
+            updateMessage(
+              assistantMsg.id,
+              { isStreaming: false, error: error.message },
+              conversationId,
+            )
           },
         },
       )
     } catch (error) {
-      updateMessage(assistantMsg.id, {
-        isStreaming: false,
-        error: error instanceof Error ? error.message : '发送失败',
-      })
+      updateMessage(
+        assistantMsg.id,
+        {
+          isStreaming: false,
+          error: error instanceof Error ? error.message : '发送失败',
+        },
+        conversationId,
+      )
     } finally {
       isSending.value = false
     }

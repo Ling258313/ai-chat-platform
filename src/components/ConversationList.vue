@@ -1,10 +1,33 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useChatStore } from '@/stores/chat'
 
 const chatStore = useChatStore()
 
+/** 处于"待确认删除"状态的会话 id —— 两步确认,防止误删无法恢复的本地聊天记录 */
+const pendingDeleteId = ref<string | null>(null)
+
 function newConversation() {
   chatStore.createConversation()
+}
+
+function selectConversation(id: string) {
+  // 点击行内其它区域 = 取消待确认状态
+  pendingDeleteId.value = null
+  chatStore.selectConversation(id)
+}
+
+function requestDelete(id: string) {
+  pendingDeleteId.value = id
+}
+
+function cancelDelete() {
+  pendingDeleteId.value = null
+}
+
+function confirmDelete(id: string) {
+  chatStore.deleteConversation(id)
+  pendingDeleteId.value = null
 }
 
 function formatTime(timestamp: number): string {
@@ -35,25 +58,42 @@ function formatTime(timestamp: number): string {
         v-for="conv in chatStore.conversations"
         :key="conv.id"
         class="item"
-        :class="{ active: conv.id === chatStore.activeConversationId }"
+        :class="{
+          active: conv.id === chatStore.activeConversationId,
+          confirming: pendingDeleteId === conv.id,
+        }"
         role="button"
         tabindex="0"
-        @click="chatStore.selectConversation(conv.id)"
-        @keydown.enter="chatStore.selectConversation(conv.id)"
+        @click="selectConversation(conv.id)"
+        @keydown.enter="selectConversation(conv.id)"
       >
-        <span class="item-icon">💬</span>
-        <div class="item-body">
-          <div class="item-title">{{ conv.title }}</div>
-          <div class="item-time">{{ formatTime(conv.createdAt) }}</div>
-        </div>
-        <button
-          class="del-btn"
-          title="删除对话"
-          aria-label="删除对话"
-          @click.stop="chatStore.deleteConversation(conv.id)"
-        >
-          ✕
-        </button>
+        <!-- 待确认删除:整行换成确认条 -->
+        <template v-if="pendingDeleteId === conv.id">
+          <span class="confirm-text">确定删除该对话?</span>
+          <button
+            class="confirm-btn danger"
+            @click.stop="confirmDelete(conv.id)"
+          >
+            删除
+          </button>
+          <button class="confirm-btn" @click.stop="cancelDelete">取消</button>
+        </template>
+
+        <template v-else>
+          <span class="item-icon">💬</span>
+          <div class="item-body">
+            <div class="item-title">{{ conv.title }}</div>
+            <div class="item-time">{{ formatTime(conv.createdAt) }}</div>
+          </div>
+          <button
+            class="del-btn"
+            title="删除对话"
+            aria-label="删除对话"
+            @click.stop="requestDelete(conv.id)"
+          >
+            ✕
+          </button>
+        </template>
       </div>
 
       <div v-if="!chatStore.hasConversations" class="empty">
@@ -194,6 +234,46 @@ function formatTime(timestamp: number): string {
 
 .del-btn:hover {
   background: var(--danger);
+  color: #fff;
+}
+
+/* 待确认删除状态 */
+.item.confirming {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  cursor: default;
+}
+
+.confirm-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--danger);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.confirm-btn {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--text-secondary);
+  transition: all 0.15s;
+}
+
+.confirm-btn:hover {
+  background: var(--border-light);
+  color: var(--text-primary);
+}
+
+.confirm-btn.danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+.confirm-btn.danger:hover {
+  background: #dc2626;
   color: #fff;
 }
 
