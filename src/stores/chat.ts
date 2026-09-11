@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import type { ChatState, Conversation, Message } from '@/types'
 import { streamChat } from '@/services/api'
 import { useSettingsStore } from '@/stores/settings'
@@ -63,14 +63,26 @@ export const useChatStore = defineStore('chat', () => {
     abortController.abort()
   }
 
-  // 持久化
-  watch(
-    conversations,
-    (val) => {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(val))
-    },
-    { deep: true },
-  )
+  /**
+   * 持久化到 localStorage。
+   *
+   * 这里刻意不用 watch(deep) 自动落盘:deep watch 会在流式输出期间被
+   * 每一个分片触发,每次都遍历全部会话、把全部内容 JSON.stringify 一遍,
+   * 长会话下每个 token 都要付这份成本。改为在"内容真正稳定"的时机显式调用。
+   *
+   * 注意:以后新增会改动 conversations 的方法,记得补一次 persist()。
+   */
+  function persist() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations.value))
+  }
+
+  // 页面隐藏/关闭时补一次:流式输出进行到一半就关页面时,已收到的内容不会丢
+  if (typeof window !== 'undefined') {
+    window.addEventListener('pagehide', persist)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') persist()
+    })
+  }
 
   /** 当前会话 */
   const activeConversation = computed(
@@ -93,6 +105,7 @@ export const useChatStore = defineStore('chat', () => {
     }
     conversations.value.unshift(conversation)
     activeConversationId.value = id
+    persist()
     return id
   }
 
@@ -107,11 +120,13 @@ export const useChatStore = defineStore('chat', () => {
     if (activeConversationId.value === id) {
       activeConversationId.value = conversations.value[0]?.id ?? null
     }
+    persist()
   }
 
   function clearConversations() {
     conversations.value = []
     activeConversationId.value = null
+    persist()
   }
 
   /** 向指定会话追加消息(内部使用,不依赖 activeConversationId) */
@@ -180,6 +195,9 @@ export const useChatStore = defineStore('chat', () => {
     // 创建占位的 AI 消息
     const assistantMsg = addMessageTo(conv, 'assistant', '')
     assistantMsg.isStreaming = true
+
+    // 用户消息与占位消息先落盘:即使随后请求失败,提问也不会丢
+    persist()
 
     isSending.value = true
 
@@ -270,6 +288,8 @@ export const useChatStore = defineStore('chat', () => {
       clearIdleTimer()
       abortController = null
       isSending.value = false
+      // 一次请求只在结束时落盘一次,而不是每个分片一次
+      persist()
     }
   }
 
