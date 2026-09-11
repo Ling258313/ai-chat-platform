@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import type { ChatState, Conversation, Message } from '@/types'
 import { streamChat } from '@/services/api'
+import { speak } from '@/services/speech'
 import { useSettingsStore } from '@/stores/settings'
 
 const STORAGE_KEY = 'ai-chat-conversations'
@@ -246,6 +247,11 @@ export const useChatStore = defineStore('chat', () => {
           },
           onDone: () => {
             updateMessage(assistantMsg.id, { isStreaming: false }, conversationId)
+            // 自动朗读(设置项 autoSpeak,原先全项目无人读取,是个死设置)。
+            // 只在用户仍停留在该会话时朗读:已经切走了还突然出声会很突兀。
+            if (settings.autoSpeak && activeConversationId.value === conversationId) {
+              speak(assistantMsg.content)
+            }
           },
           onError: (error) => {
             updateMessage(

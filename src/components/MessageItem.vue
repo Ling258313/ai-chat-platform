@@ -10,8 +10,8 @@ const props = defineProps<{
 const { isSpeaking, supported, speakText, stop } = useSpeechSynthesis()
 const isCopied = ref(false)
 
-// 自动朗读 AI 回复(如果开启了设置)
-// 由父组件控制,这里只提供手动朗读
+// 自动朗读由 chat store 在流式结束时统一处理(见 stores/chat.ts 的 onDone),
+// 这里只负责手动朗读与停止
 watch(
   () => props.message.content,
   (val) => {

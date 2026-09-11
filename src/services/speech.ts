@@ -146,15 +146,23 @@ export function createSpeechRecognizer(
 
 /**
  * 语音合成:朗读文本
+ * @param onEnd 朗读真正结束时回调(正常读完 / 出错 / 被 cancel 中断都会触发)。
+ *   调用方靠它复位状态,而不是按字数估算时长 —— 语速、标点、语言都会影响实际耗时,估算必然不准。
  */
-export function speak(text: string): void {
+export function speak(text: string, onEnd?: () => void): void {
   if (!isSpeechSynthesisSupported()) return
 
+  // 先取消上一次朗读,避免叠加播放
   window.speechSynthesis.cancel()
   const utterance = new SpeechSynthesisUtterance(text)
   utterance.lang = 'zh-CN'
   utterance.rate = 1
   utterance.pitch = 1
+  // 两条路径都要回调:正常结束走 onend,cancel/出错走 onerror
+  if (onEnd) {
+    utterance.onend = () => onEnd()
+    utterance.onerror = () => onEnd()
+  }
   window.speechSynthesis.speak(utterance)
 }
 

@@ -11,13 +11,13 @@ export function useSpeechSynthesis() {
 
   function speakText(text: string) {
     if (!supported || !text.trim()) return
-    speak(text)
     isSpeaking.value = true
-    // 估算朗读结束时间
-    const estimateMs = Math.max(2000, text.length * 300)
-    setTimeout(() => {
+    // 用语音引擎真正的结束事件复位,而不是按字数估算:
+    // 原先的 max(2000, 字数 × 300) 会让 200 字等 60 秒,
+    // 期间按钮一直显示"停止",而实际早就读完了。
+    speak(text, () => {
       isSpeaking.value = false
-    }, estimateMs)
+    })
   }
 
   function stop() {
@@ -27,6 +27,7 @@ export function useSpeechSynthesis() {
 
   onUnmounted(() => {
     stopSpeaking()
+    isSpeaking.value = false
   })
 
   return { isSpeaking, supported, speakText, stop }
