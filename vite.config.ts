@@ -18,11 +18,13 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // 代理 OpenAI 兼容 API,避免跨域
-      '/api/chat': {
-        target: 'https://api.openai.com',
+      // 把 /api 转发给本地的 Node BFF(server/ 目录)。
+      // 走这一层之后,大模型的 API Key 只存在于服务端环境变量里,
+      // 浏览器不再持有密钥,产物里也不会内联任何密钥。
+      // 启动方式:cd server && npm run dev
+      '/api': {
+        target: 'http://localhost:3000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/chat/, '/v1/chat/completions'),
       },
     },
   },

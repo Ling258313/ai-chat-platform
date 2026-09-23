@@ -27,10 +27,11 @@ function saveSettings() {
             v-model="settingsStore.settings.apiBaseUrl"
             class="form-input"
             type="text"
-            placeholder="如 https://api.openai.com/v1 (留空则使用本地代理)"
+            placeholder="留空即走本地 Node 服务(推荐)"
           >
           <p class="form-hint">
-            支持 OpenAI / DeepSeek / Moonshot / Ollama 等兼容接口。留空时使用 Vite 代理。
+            留空时请求本地 Node 服务(见 server/ 目录),大模型密钥保存在服务端环境变量里,浏览器不会拿到;
+            填写地址则直连该服务,此时密钥会存进浏览器 localStorage,仅建议本地调试时使用。
           </p>
         </div>
 
@@ -43,7 +44,9 @@ function saveSettings() {
             placeholder="sk-..."
             autocomplete="off"
           >
-          <p class="form-hint">密钥仅保存在本地浏览器,不会上传到任何服务器。</p>
+          <p class="form-hint">
+            走本地 Node 服务时无需填写;直连模式下会明文保存在浏览器 localStorage 中,存在泄露风险。
+          </p>
         </div>
 
         <div class="form-group">

@@ -1,0 +1,19 @@
+{
+  "name": "ai-chat-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AI 对话平台的服务端 BFF：把大模型调用从浏览器搬到 Node，密钥不再下发到前端",
+  "engines": {
+    "node": ">=20.6.0"
+  },
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=.env src/index.js",
+    "start": "node --env-file-if-exists=.env src/index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "helmet": "^8.3.0"
+  }
+}

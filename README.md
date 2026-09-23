@@ -1,6 +1,6 @@
 # 🤖 AI 对话平台
 
-基于 **Vue 3 + Vite + Pinia + Vue Router + TypeScript** 的 AI 对话平台,集成了 **Web Speech API** 实现语音识别(STT),支持对接 **OpenAI 兼容 API**。
+基于 **Vue 3 + Vite + Pinia + Vue Router + TypeScript** 的 AI 对话平台,**配有一层 Node.js + Express 的 BFF** 负责对接大模型,集成 **Web Speech API** 实现语音识别(STT),支持对接 **OpenAI 兼容 API**。
 
 ## ✨ 功能特性
 
@@ -8,7 +8,8 @@
 - 🎤 **语音识别(STT)**:使用 Web Speech API,支持按住说话,自动将语音转文字
 - 🔊 **语音合成(TTS)**(可选):将 AI 回复朗读出来
 - 🗂️ **多会话管理**:创建、切换、删除多个对话会话
-- ⚙️ **灵活配置**:可在设置页配置 API 地址、Key、模型,支持自定义系统提示词
+- ⚙️ **灵活配置**:可在设置页配置模型、系统提示词、温度
+- 🔐 **密钥不下发**:大模型 API Key 只存在于服务端环境变量中,浏览器全程不接触,构建产物里也不会内联
 - 📱 **响应式布局**:适配桌面和移动端
 
 ## 🛠️ 技术栈
@@ -22,6 +23,7 @@
 | [TypeScript](https://www.typescriptlang.org/) | 类型安全 |
 | [Web Speech API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API) | 语音识别与合成 |
 | [OpenAI 兼容 API](https://platform.openai.com/docs/api-reference) | AI 对话能力(兼容 DeepSeek、Moonshot、Ollama 等) |
+| [Node.js](https://nodejs.org/) + [Express](https://expressjs.com/) | 服务端 BFF:持有密钥、SSE 流式透传(见 `server/`) |
 
 ## 📁 项目结构
 
@@ -32,6 +34,7 @@ vue-project/
 ├── tsconfig.json             # TS 配置(引用 app/node 子配置)
 ├── vite.config.ts            # Vite 配置(含 API 代理)
 ├── docs/                     # 项目文档(详见下方"项目文档")
+├── server/                   # Node.js + Express BFF(详见 server/README.md)
 ├── src/
 │   ├── main.ts               # 应用入口
 │   ├── App.vue               # 根组件
@@ -125,19 +128,43 @@ npm run preview   # 预览构建结果
 - **温度**:控制回答的随机性(0~2)
 - **朗读回复**:是否自动朗读 AI 的回复
 
-## 🌐 跨域代理
+## 🖥️ 服务端(Node.js + Express BFF)
 
-`vite.config.ts` 中已配置代理,把 `/api/chat` 转发到 OpenAI 兼容地址:
+`server/` 是一层 BFF,负责对接大模型。**它存在的原因是一个真实的安全问题**:
+
+改造前,浏览器直接拿着 API Key 去请求大模型厂商,Key 存在 `localStorage` 里,
+打开开发者工具就能抄走,而且会出现在每一次出站请求中。现在密钥只存在于服务端环境变量里。
+
+```
+浏览器 ───── 无密钥 ─────►  Node BFF  ───── Bearer sk-xxxx ─────►  大模型 API
+                              ↑
+                       Key 只在服务端环境变量中
+```
+
+对用户来说体验没有任何变化:回复依然是逐字流式出现的。
+
+**启动服务端:**
+
+```bash
+cd server
+npm install
+cp .env.example .env    # 填入 UPSTREAM_API_KEY
+npm run dev             # http://localhost:3000
+```
+
+**前端代理:** `vite.config.ts` 把 `/api` 转发到本地的 Node 服务:
 
 ```ts
-'/api/chat': {
-  target: 'https://api.openai.com',
+'/api': {
+  target: 'http://localhost:3000',
   changeOrigin: true,
-  rewrite: (path) => path.replace(/^\/api\/chat/, '/v1/chat/completions'),
 }
 ```
 
-如果你在设置页填了完整 API 地址(如 `https://api.openai.com/v1`),会**直接请求**该地址;若留空则使用 Vite 代理,避免浏览器跨域限制。
+设置页的 **API 地址留空即走这条链路**(推荐);填写地址则直连该服务,此时密钥会存进浏览器,
+仅建议本地调试时使用。
+
+服务端的实现细节(SSE 透传、背压处理、优雅关闭、已知边界)见 [`server/README.md`](server/README.md)。
 
 ## 🧠 数据持久化
 
