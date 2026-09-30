@@ -30,6 +30,10 @@
 └──────────────┘  └────────────────┘
 ```
 
+> 上图中 Vite Dev Server 的 `/api` 代理实际指向本地 **Node BFF(Express)**,
+> 由 BFF 携带密钥请求上游「OpenAI 兼容 API」;浏览器与 BFF 之间不传递任何密钥。
+> 设置页填写了 API 地址的「直连调试模式」会绕过 BFF,此时密钥存在浏览器 localStorage 中。
+
 ## 数据流
 
 ### 文本对话流程
@@ -123,7 +127,9 @@ interface Settings {
 
 1. **流式输出**:使用 SSE 解析,让 AI 回复"打字机"效果实时显示
 2. **本地持久化**:会话数据存 localStorage,刷新不丢失
-3. **跨域处理**:设置页填 API 地址时直接请求;留空走 Vite 代理
+3. **密钥不下发**:默认走 Node BFF(Vite 把 `/api` 代理到本地 Express 服务),API Key 只在服务端环境变量中,
+   浏览器与构建产物均不接触;仅「直连调试模式」下才由浏览器直接请求上游。
+   详见 [AI 服务对接](ai-integration.md) 与 [`../server/README.md`](../server/README.md)
 4. **语音降级**:浏览器不支持 Web Speech API 时,隐藏语音按钮并提示
 5. **TypeScript**:全链路类型安全,配置、消息、会话均有类型定义
 

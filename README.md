@@ -67,31 +67,46 @@ vue-project/
 ### 1. 安装依赖
 
 ```bash
-npm install
+npm install                        # 前端
+cd server && npm install && cd ..  # Node BFF
 ```
 
-### 2. 配置环境变量
+### 2. 配置密钥(只配服务端,前端不需要)
 
-复制 `.env.example` 为 `.env.local`,填入你的 API 信息:
+**前端不需要任何 API 配置**——Key 只存在于服务端的 `.env` 里:
 
 ```bash
-# OpenAI 兼容 API 地址
-VITE_API_BASE_URL=https://api.openai.com/v1
-# API Key(可在设置页覆盖)
-VITE_API_KEY=sk-xxxxxxxx
-# 默认模型
-VITE_MODEL=gpt-4o-mini
+cd server
+cp .env.example .env
+```
+
+```bash
+# server/.env
+PORT=3000
+UPSTREAM_BASE_URL=https://api.openai.com/v1
+UPSTREAM_API_KEY=sk-xxxxxxxx    # 只在这里,不进浏览器、不进构建产物
+DEFAULT_MODEL=gpt-4o-mini
+CORS_ORIGINS=http://localhost:5173
 ```
 
 > **支持的服务**:OpenAI、DeepSeek、Moonshot(Kimi)、通义千问、Ollama 本地等所有兼容 OpenAI Chat Completions 接口的服务。
+>
+> ⚠️ 根目录的 `.env.example` 是**直连调试模式**用的(仅在设置页填了 API 地址时生效)。
+> 里面的变量以 `VITE_` 开头,Vite 会在构建时把它们**静态替换成字面量写进 `dist/*.js`**,
+> 所以不要在那里填真实 Key。详见该文件头部注释。
 
-### 3. 启动开发服务器
+### 3. 启动(需要两个终端)
 
 ```bash
-npm run dev
+# 终端 1:Node BFF
+cd server && npm run dev     # http://localhost:3000
+
+# 终端 2:前端
+npm run dev                  # http://localhost:5173
 ```
 
-浏览器打开 `http://localhost:5173`
+浏览器打开 `http://localhost:5173`。前端把 `/api` 代理到本地 BFF(见 `vite.config.ts`),
+**设置页的「API 地址」留空**即走这条链路(推荐)。
 
 ### 4. 构建生产版本
 
@@ -99,6 +114,10 @@ npm run dev
 npm run build
 npm run preview   # 预览构建结果
 ```
+
+> 生产环境没有 Vite 代理,需要由 Nginx 等反向代理把 `/api` 转发到 BFF。
+> 注意对 SSE 关闭响应缓冲(`proxy_buffering off`),BFF 已返回 `X-Accel-Buffering: no` 配合,
+> 否则「逐字输出」会退化成「一次性吐出」。
 
 ## 🎤 语音功能说明
 
@@ -122,7 +141,7 @@ npm run preview   # 预览构建结果
 在设置页可配置:
 
 - **API 地址**:OpenAI 兼容的接口地址
-- **API Key**:你的密钥(仅保存在浏览器 localStorage)
+- **API Key**:**仅直连调试模式需要**;留空 API 地址走 BFF 时无需填写,也不会存进浏览器
 - **模型名称**:如 `gpt-4o-mini`、`deepseek-chat`、`moonshot-v1-8k` 等
 - **系统提示词**:自定义 AI 的角色和行为
 - **温度**:控制回答的随机性(0~2)
@@ -169,7 +188,7 @@ npm run dev             # http://localhost:3000
 ## 🧠 数据持久化
 
 - 会话与消息保存在浏览器 `localStorage`
-- API 配置保存在 `localStorage`(注意:Key 以明文存储,仅用于本地开发)
+- API 配置(地址 / 模型 / 温度等)保存在 `localStorage`;Key 仅在直连调试模式下会以明文存进去,走 BFF 时不落盘
 - 刷新页面后对话记录仍在
 
 ## 📚 项目文档

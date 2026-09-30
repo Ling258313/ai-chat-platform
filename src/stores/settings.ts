@@ -5,6 +5,7 @@ import type { Settings } from '@/types'
 const STORAGE_KEY = 'ai-chat-settings'
 
 const DEFAULT_SETTINGS: Settings = {
+  theme: 'system',
   apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? '',
   // 安全:仅开发模式允许用环境变量里的 Key 作为默认值。
   // import.meta.env.DEV 在构建时会被替换成字面量 false,整个分支随之被摇掉,

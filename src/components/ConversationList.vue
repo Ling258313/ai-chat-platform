@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useChatStore } from '@/stores/chat'
+import { useNewConversation } from '@/composables/useNewConversation'
 
 const chatStore = useChatStore()
+
+// 新建对话要跳到对话页，这段逻辑和顶栏共用（见 @/composables/useNewConversation）
+const newConversation = useNewConversation()
 
 /** 处于"待确认删除"状态的会话 id —— 两步确认,防止误删无法恢复的本地聊天记录 */
 const pendingDeleteId = ref<string | null>(null)
 
-function newConversation() {
-  chatStore.createConversation()
-}
 
 function selectConversation(id: string) {
   // 点击行内其它区域 = 取消待确认状态

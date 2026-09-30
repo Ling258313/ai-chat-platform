@@ -4,7 +4,7 @@
 
 ## 一、存储总览
 
-项目无后端服务,所有数据保存在浏览器 `localStorage`,共两个键:
+服务端 `server/` 是无状态 BFF,不落库;所有业务数据保存在浏览器 `localStorage`,共两个键:
 
 | 存储键 | 内容 | 写入方 |
 |--------|------|--------|
@@ -94,12 +94,13 @@ localStorage.clear()
 
 ## 五、安全注意事项
 
-> ⚠️ **API Key 以明文存储**在 `ai-chat-settings` 中。
+> ⚠️ **只有在「直连调试模式」下 API Key 才会以明文存进** `ai-chat-settings`;
+> 默认的 BFF 链路(设置页 API 地址留空)不会把密钥写进浏览器。
 
-- 适合个人本地使用;共享电脑/公共设备上请谨慎
+- 默认链路下请求经 Node BFF 转发,密钥只存在于服务端 `server/.env`,构建产物里也不会内联
+- 直连调试模式仅适合个人本地使用;共享电脑/公共设备上请谨慎
 - localStorage 中的数据任何同源脚本均可读取,勿存放敏感凭据
-- 建议生产环境通过后端代理转发请求,避免在前端暴露 Key(参见 [AI 服务对接](ai-integration.md))
-- `.env.local` 已被 `.gitignore` 忽略,不会把 Key 提交到仓库
+- 不要把含真实 Key 的文件提交到仓库(`server/.env`、`.env.local` 均已被 `.gitignore` 忽略)
 
 ## 六、扩展指引
 

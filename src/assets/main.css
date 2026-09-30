@@ -49,24 +49,22 @@
 }
 
 /* 暗色模式 */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0f172a;
-    --bg-sidebar: #1e293b;
-    --bg-chat: #0f172a;
+:root[data-theme='dark'] {
+  --bg: #0f172a;
+  --bg-sidebar: #1e293b;
+  --bg-chat: #0f172a;
 
-    --text-primary: #f1f5f9;
-    --text-secondary: #94a3b8;
-    --text-muted: #64748b;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
 
-    --border: #334155;
-    --border-light: #1e293b;
+  --border: #334155;
+  --border-light: #1e293b;
 
-    --bubble-ai: #1e293b;
-    --bubble-ai-text: #e2e8f0;
+  --bubble-ai: #1e293b;
+  --bubble-ai-text: #e2e8f0;
 
-    --primary-bg: #312e81;
-  }
+  --primary-bg: #312e81;
 }
 
 * {

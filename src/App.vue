@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import AppHeader from '@/components/AppHeader.vue'
 import ConversationList from '@/components/ConversationList.vue'
+import { useTheme } from '@/composables/useTheme'
+
+// 主题在应用根组件挂一次：解析偏好并写到 <html data-theme>
+useTheme()
 </script>
 
 <template>

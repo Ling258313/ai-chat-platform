@@ -8,8 +8,8 @@
 
 | 变量 | 说明 | 示例 |
 |------|------|------|
-| `VITE_API_BASE_URL` | OpenAI 兼容 API 地址(可留空走本地代理) | `https://api.deepseek.com` |
-| `VITE_API_KEY` | API Key(可在设置页覆盖) | `sk-xxxxxxxx` |
+| `VITE_API_BASE_URL` | OpenAI 兼容 API 地址(**仅直连调试模式**;留空则走本地 BFF,推荐) | `https://api.deepseek.com` |
+| `VITE_API_KEY` | ⚠️ **仅直连调试模式需要**;以 `VITE_` 开头的变量会被内联进 `dist/*.js`,不要填真实 Key | `sk-xxxxxxxx` |
 | `VITE_MODEL` | 默认模型名称 | `deepseek-chat` |
 
 支持的 API 服务示例:
@@ -32,7 +32,8 @@ VITE_API_BASE_URL=http://localhost:11434/v1
 VITE_MODEL=qwen2.5
 ```
 
-> ⚠️ 环境变量在 **构建时** 被静态替换,修改 `.env.local` 后需重启 `npm run dev` 或重新 `npm run build` 才生效。
+> ⚠️ 环境变量在 **构建时** 被静态替换,修改 `.env.development.local` 后需重启 `npm run dev` 才生效。
+> 走 BFF 链路(推荐)时以上变量全部留空即可,密钥配置见 `server/.env.example`。
 
 ## 二、设置项(设置页)
 
@@ -40,8 +41,8 @@ VITE_MODEL=qwen2.5
 
 | 字段 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| API 地址 `apiBaseUrl` | string | 环境变量 `VITE_API_BASE_URL`(默认空) | 留空则使用 Vite 代理 `/api/chat` |
-| API Key `apiKey` | string | 环境变量 `VITE_API_KEY`(默认空) | 明文保存在 localStorage |
+| API 地址 `apiBaseUrl` | string | 环境变量 `VITE_API_BASE_URL`(默认空) | **留空则走本地 Node BFF**(Vite 把 `/api` 代理到 `localhost:3000`),推荐 |
+| API Key `apiKey` | string | 环境变量 `VITE_API_KEY`(默认空) | **留空即可**:密钥由 BFF 在服务端持有。仅直连调试模式下填了才会明文存进 localStorage |
 | 模型名称 `model` | string | 环境变量 `VITE_MODEL`(默认 `deepseek-v4-flash`) | 如 `gpt-4o-mini`、`deepseek-chat` |
 | 系统提示词 `systemPrompt` | string | 内置默认文案 | 定义 AI 的角色与行为 |
 | 温度 `temperature` | number | `0.7` | 范围 0~2,越低越确定 |
@@ -71,7 +72,8 @@ VITE_MODEL=qwen2.5
 
 ## 五、安全提示
 
-- API Key 以 **明文** 形式存储在浏览器 localStorage,仅适合个人本地使用
-- 请不要在共享电脑上勾选「记住」类配置,也不要把 `.env.local` 提交到版本库
+- 走 BFF 链路(推荐)时,**API Key 只存在于服务端 `.env`**,浏览器全程不接触,构建产物里也不会内联
+- 仅在设置页填写了 API 地址的 **直连调试模式** 下,Key 才会以明文存进 localStorage,请勿在共享电脑上使用
+- 不要把 `server/.env`、`.env.local` 或任何含真实 Key 的文件提交到版本库(均已在 `.gitignore` 中忽略)
 
 关联文档:[快速开始](getting-started.md) · [数据持久化](data-persistence.md) · [AI 服务对接](ai-integration.md)

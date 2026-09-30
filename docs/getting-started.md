@@ -14,37 +14,48 @@
 ## 2. 安装依赖
 
 ```bash
-npm install
+npm install                        # 前端
+cd server && npm install && cd ..  # Node BFF
 ```
 
-## 3. 配置环境变量
+## 3. 配置密钥(只配服务端,前端不需要)
 
-复制 `.env.example` 为 `.env.local` 并填入你的 API 信息:
+**前端不需要任何 API 配置**——Key 只存在于服务端的 `.env` 里:
 
 ```bash
-# OpenAI 兼容 API 地址(支持 OpenAI / DeepSeek / Moonshot / Ollama 等)
-VITE_API_BASE_URL=https://api.deepseek.com
-
-# API Key(可在设置页覆盖)
-VITE_API_KEY=sk-xxxxxxxx
-
-# 默认模型
-VITE_MODEL=deepseek-chat
+cd server
+cp .env.example .env
 ```
 
-各变量说明详见 [环境变量与设置](configuration.md)。
+```bash
+# server/.env
+PORT=3000
+UPSTREAM_BASE_URL=https://api.deepseek.com/v1
+UPSTREAM_API_KEY=sk-xxxxxxxx    # 只在这里,不进浏览器、不进构建产物
+DEFAULT_MODEL=deepseek-chat
+CORS_ORIGINS=http://localhost:5173
+```
 
-> ⚠️ `.env.local` 已被 `.gitignore` 忽略,不会提交到版本库;请勿把真实 Key 写入 `.env.example`。
+> ⚠️ 根目录的 `.env.example` 是**直连调试模式**用的,里面的变量以 `VITE_` 开头,
+> Vite 会在构建时把它们**静态替换成字面量写进 `dist/*.js`**,不要在那里填真实 Key。
+> 确需使用请复制为 `.env.development.local`(仅 dev 加载),**不要**复制为 `.env.local`。
 
-## 4. 启动开发服务器
+各变量说明详见 [环境变量与设置](configuration.md);服务端配置见 [`../server/README.md`](../server/README.md)。
+
+## 4. 启动(需要两个终端)
 
 ```bash
-npm run dev
+# 终端 1:Node BFF
+cd server && npm run dev     # http://localhost:3000
+
+# 终端 2:前端
+npm run dev                  # http://localhost:5173
 ```
 
 浏览器打开 <http://localhost:5173> 即可使用。
 
-> Vite 已配置 `/api/chat` 代理转发到 OpenAI 兼容地址,避免浏览器跨域问题,详见 [AI 服务对接](ai-integration.md)。
+> Vite 已把 `/api` 代理到本地 Node BFF(见 `vite.config.ts`),由 BFF 携带密钥请求上游,
+> 浏览器全程不接触密钥。详见 [AI 服务对接](ai-integration.md)。
 
 ## 5. 构建生产版本
 

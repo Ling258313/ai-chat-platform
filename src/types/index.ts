@@ -30,8 +30,13 @@ export interface ChatState {
   isSending: boolean
 }
 
+/** 主题模式:跟随系统 / 强制浅色 / 强制深色 */
+export type ThemeMode = 'system' | 'light' | 'dark'
+
 /** 应用设置 */
 export interface Settings {
+  /** 主题模式 */
+  theme: ThemeMode
   /** OpenAI 兼容 API 地址 */
   apiBaseUrl: string
   /** API Key */
@@ -61,4 +66,18 @@ export interface SpeechRecognitionCallbacks {
   onError?: (error: Error) => void
   onEnd?: () => void
   onStart?: () => void
+}
+
+/**
+ * 语音识别的「门面句柄」。
+ *
+ * ★ 注意它不是浏览器的原生 SpeechRecognition:
+ *   原生对象有 lang / continuous / onresult 等一大堆属性和会抛异常的 start(),
+ *   这里只暴露三个方法,而且内部自己管好了状态 ——
+ *   重复 start 会被静默忽略、失败会回滚,调用方不用操心。
+ */
+export interface SpeechRecognizerHandle {
+  start: () => void
+  stop: () => void
+  abort: () => void
 }

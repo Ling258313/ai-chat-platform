@@ -9,16 +9,24 @@ vue-project/
 ├── index.html                    # HTML 入口(挂载点 #app,加载 /src/main.ts)
 ├── package.json                  # 项目元信息、依赖与脚本
 ├── package-lock.json             # 依赖锁定文件
-├── vite.config.ts                # Vite 配置(别名 @、端口、/api/chat 代理)
+├── vite.config.ts                # Vite 配置(别名 @、端口、/api → 本地 Node BFF 代理)
 ├── tsconfig.json                 # TS 工程引用(聚合 app/node 两个子配置)
 ├── tsconfig.app.json             # 应用代码 TS 配置(strict,含 @/* 路径别名)
 ├── tsconfig.node.json            # 构建工具侧(Vite 配置)TS 配置
 ├── .env.example                  # 环境变量模板(提交到仓库)
-├── .env.local                    # 本地环境变量(已被 gitignore,不提交)
+├── .env.local                    # 直连调试模式的环境变量(已被 gitignore;不要放真实 Key)
 ├── .gitignore                    # Git 忽略规则
 ├── .vscode/
 │   ├── extensions.json           # 推荐的 VSCode 扩展
 │   └── settings.json             # 文件嵌套显示等编辑器设置
+├── server/                       # Node.js + Express BFF(详见 server/README.md)
+│   ├── src/
+│   │   ├── index.js              # Express 应用装配:中间件顺序、SIGTERM 优雅关闭
+│   │   ├── config.js             # 环境变量读取与校验(缺 Key 直接退出)
+│   │   ├── routes/chat.js        # POST /api/chat:校验、SSE 透传、断开即 abort 上游
+│   │   └── middleware/           # rateLimit.js 滑动窗口限流 / errorHandler.js 统一错误
+│   ├── .env.example              # 服务端配置模板(UPSTREAM_API_KEY 等)
+│   └── README.md                 # BFF 设计说明与已知边界
 ├── public/
 │   └── favicon.ico               # 站点图标
 ├── dist/                         # 构建产物目录(不提交,由 npm run build 生成)

@@ -31,15 +31,18 @@ streamChat(
 
 ```ts
 if (apiBaseUrl) {
-  // 模式一:用户配置了完整地址 → 直接请求
+  // 模式一(直连调试,不推荐):用户配置了完整地址 → 浏览器直接请求上游
   url = `${apiBaseUrl.replace(/\/$/, '')}/chat/completions`
 } else {
-  // 模式二:未配置 → 走 Vite 代理,避免浏览器跨域
+  // 模式二(推荐):未配置 → 请求本地 Node BFF
+  //   Vite 把 /api 代理到 http://localhost:3000,密钥由 BFF 在服务端注入
   url = '/api/chat'
 }
 ```
 
 > 注意:若在设置页填写 `https://api.openai.com/v1`,实际请求地址为 `https://api.openai.com/v1/chat/completions`(自动去除末尾 `/` 并拼接)。
+>
+> 模式二下前端**不发送** `Authorization` 头(见下节 `if (apiKey)`),由 BFF 用自己 `.env` 里的 `UPSTREAM_API_KEY` 向上游鉴权。
 
 ### 请求头与请求体
 
@@ -105,21 +108,26 @@ data: [DONE]
 6. 失败时在消息上记录 `error` 字段展示错误气泡
 7. `finally` 中复位 `isSending`,期间输入框与发送按钮禁用
 
-## 五、Vite 开发代理
+## 五、开发代理与 Node BFF
 
-`vite.config.ts` 中配置了 `/api/chat` 代理:
+`vite.config.ts` 把 `/api` 整体代理到本地 Node BFF:
 
 ```ts
-'/api/chat': {
-  target: 'https://api.openai.com',
+'/api': {
+  target: 'http://localhost:3000',
   changeOrigin: true,
-  rewrite: (path) => path.replace(/^\/api\/chat/, '/v1/chat/completions'),
 }
 ```
 
-- 开发时若设置页 **未填写** API 地址,请求 `/api/chat` 会被代理到 `https://api.openai.com/v1/chat/completions`
-- 生产部署时不经过 Vite 代理,因此线上使用 **必须** 在设置页填写完整的 API 地址,或自行配置反向代理
-- 修改目标服务(如改为 DeepSeek)时,直接改 `target` 与 `rewrite` 即可
+- 设置页 **未填写** API 地址时,请求 `/api/chat` 被原样转发到 `http://localhost:3000/api/chat`,由 BFF 处理(不做 rewrite)
+- BFF 持有上游密钥并负责 SSE 透传,浏览器全程不接触密钥;实现见 [`../server/README.md`](../server/README.md)
+- 换上游服务(如改为 DeepSeek)只需改 `server/.env` 的 `UPSTREAM_BASE_URL`,**前端无需重新构建**
+- 生产部署没有 Vite 代理,需由 Nginx 等反向代理把 `/api` 转发到 BFF,并对 SSE 关闭响应缓冲
+
+### 直连调试模式(不推荐)
+
+设置页若填了完整 API 地址,前端会绕过 BFF 直接请求上游,此时密钥存在浏览器 localStorage 里。
+仅建议本地调试单个上游时使用。
 
 ## 六、扩展建议
 

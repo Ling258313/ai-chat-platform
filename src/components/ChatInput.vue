@@ -1,108 +1,135 @@
 <script setup lang="ts">
-import { onUnmounted, ref } from 'vue'
-import { useChatStore } from '@/stores/chat'
-import { createSpeechRecognizer, isSpeechRecognitionSupported } from '@/services/speech'
+import { onUnmounted, ref } from "vue";
+import { useChatStore } from "@/stores/chat";
+import {
+  createSpeechRecognizer,
+  isSpeechRecognitionSupported,
+} from "@/services/speech";
+import type { SpeechRecognizerHandle } from "@/types";
 
-const chatStore = useChatStore()
-const inputRef = ref<HTMLTextAreaElement | null>(null)
-const text = ref('')
-const isListening = ref(false)
-const isSupported = isSpeechRecognitionSupported()
+const chatStore = useChatStore();
+const inputRef = ref<HTMLTextAreaElement | null>(null);
+const text = ref("");
+const isListening = ref(false);
+const isSupported = isSpeechRecognitionSupported();
 
-let recognizer: { start: () => void; stop: () => void; abort: () => void } | null = null
+//   它只有三个方法,内部自己管 started 状态,所以不用关心原生 start() 会抛异常
+let recognizer: SpeechRecognizerHandle | null = null;
 
 function handleInput() {
   // 自动调整高度
-  const el = inputRef.value
+  const el = inputRef.value;
   if (el) {
-    el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, 160)}px`
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }
 }
 
 function handleKeydown(e: KeyboardEvent) {
   // Enter 发送,Shift+Enter 换行
-  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
-    e.preventDefault()
-    handleSend()
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    handleSend();
   }
 }
 
 async function handleSend() {
-  const content = text.value.trim()
-  if (!content || chatStore.isSending) return
+  const content = text.value.trim();
+  if (!content || chatStore.isSending) return;
 
   // 停止语音识别
   if (isListening.value) {
-    stopListening()
+    stopListening();
   }
 
-  text.value = ''
+  text.value = "";
   if (inputRef.value) {
-    inputRef.value.style.height = 'auto'
+    inputRef.value.style.height = "auto";
   }
 
-  await chatStore.sendMessage(content)
-  inputRef.value?.focus()
+  await chatStore.sendMessage(content);
+  inputRef.value?.focus();
 }
 
 function startListening() {
   if (!isSupported) {
-    alert('当前浏览器不支持语音识别,请使用 Chrome 或 Edge')
-    return
+    alert("当前浏览器不支持语音识别,请使用 Chrome 或 Edge");
+    return;
   }
 
   // 需要 HTTPS 或 localhost
-  if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
-    alert('语音识别需要 HTTPS 环境,请在 localhost 或 HTTPS 下使用')
-    return
+  if (
+    window.location.protocol !== "https:" &&
+    window.location.hostname !== "localhost"
+  ) {
+    alert("语音识别需要 HTTPS 环境,请在 localhost 或 HTTPS 下使用");
+    return;
   }
 
   if (!recognizer) {
+    // 懒创建:识别器只需要一个,内部挂着四个回调,重复创建会让回调越挂越多
+    //
+    // 下面四个回调按「实际触发顺序」排列:
+    //   onStart -> onResult(可能几十次) -> [onError] -> onEnd
+    // 对象字面量的书写顺序不影响执行,但按顺序写读起来不用来回跳。
     recognizer = createSpeechRecognizer({
-      onResult: (result) => {
-        text.value = result
-        handleInput()
+      // ① 识别引擎启动成功(点麦克风之后最先到)
+      onStart: () => {
+        isListening.value = true;
       },
+      // ② 每识别出一段文字就回调一次,result 是「确认文本 + 中间文本」拼好的完整串
+      onResult: (result) => {
+        text.value = result;
+        handleInput(); // 内容变了要重新算 textarea 高度
+      },
+      // ③ 出错(可选,不是每次都有)
       onError: (err) => {
-        isListening.value = false
+        // 这里也复位一次:虽然出错后一般还会来 onEnd,
+        // 但不能依赖「onError 之后一定会来 onEnd」这个假设。
+        isListening.value = false;
         // network 类错误(国内 Chrome 无法访问 Google 服务)给出更醒目的提示
-        const msg = err.message
-        if (msg.includes('network') || msg.includes('网络错误') || msg.includes('Google')) {
-          alert('语音识别暂不可用:' + msg + '\n\n建议:改用 Edge 浏览器,或使用文本输入。')
+        const msg = err.message;
+        if (
+          msg.includes("network") ||
+          msg.includes("网络错误") ||
+          msg.includes("Google")
+        ) {
+          alert(
+            "语音识别暂不可用:" +
+              msg +
+              "\n\n建议:改用 Edge 浏览器,或使用文本输入。",
+          );
         } else {
-          alert(msg)
+          alert(msg);
         }
       },
+      // ④ 收尾:自然结束 / stop() / abort() 三种情况都会走到这里
       onEnd: () => {
-        isListening.value = false
+        isListening.value = false;
       },
-      onStart: () => {
-        isListening.value = true
-      },
-    })
+    });
   }
 
-  recognizer?.start()
+  recognizer?.start();
 }
 
 function stopListening() {
-  recognizer?.stop()
+  recognizer?.stop();
 }
 
 function toggleListening() {
   if (isListening.value) {
-    stopListening()
+    stopListening();
   } else {
-    startListening()
+    startListening();
   }
 }
 
 onUnmounted(() => {
   if (isListening.value) {
-    recognizer?.abort()
+    recognizer?.abort();
   }
-})
+});
 </script>
 
 <template>
@@ -115,7 +142,7 @@ onUnmounted(() => {
         :disabled="!isSupported"
         @click="toggleListening"
       >
-        <span class="mic-icon">{{ isListening ? '⏹' : '🎤' }}</span>
+        <span class="mic-icon">{{ isListening ? "⏹" : "🎤" }}</span>
         <span v-if="isListening" class="mic-pulse"></span>
       </button>
 
@@ -154,7 +181,7 @@ onUnmounted(() => {
       ⚠️ 当前浏览器不支持语音识别,请使用 Chrome / Edge / Safari
     </p>
     <p v-else class="tip">
-      {{ isListening ? '🎤 正在聆听,请说话…' : '支持语音输入,点击 🎤 开始' }}
+      {{ isListening ? "🎤 正在聆听,请说话…" : "支持语音输入,点击 🎤 开始" }}
     </p>
   </div>
 </template>
@@ -176,7 +203,9 @@ onUnmounted(() => {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 8px;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 
 .chat-input:focus-within {

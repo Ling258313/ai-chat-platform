@@ -1,14 +1,21 @@
 <script setup lang="ts">
-import { useRoute, useRouter } from 'vue-router'
-import { useChatStore } from '@/stores/chat'
+import { useRoute } from 'vue-router'
+import { useNewConversation } from '@/composables/useNewConversation'
+import { useSettingsStore } from '@/stores/settings'
+import type { ThemeMode } from '@/types'
 
 const route = useRoute()
-const router = useRouter()
-const chatStore = useChatStore()
+const handleNewChat = useNewConversation()
+const settingsStore = useSettingsStore()
 
-function handleNewChat() {
-  chatStore.createConversation()
-  router.push('/')
+const THEME_ORDER: ThemeMode[] = ['system', 'light', 'dark']
+const THEME_ICON: Record<ThemeMode, string> = { system: '🌗', light: '☀️', dark: '🌙' }
+const THEME_LABEL: Record<ThemeMode, string> = { system: '跟随系统', light: '浅色', dark: '深色' }
+
+function cycleTheme() {
+  const current = settingsStore.settings.theme ?? 'system'
+  const next = THEME_ORDER[(THEME_ORDER.indexOf(current) + 1) % THEME_ORDER.length]!
+  settingsStore.updateSettings({ theme: next })
 }
 </script>
 
@@ -29,6 +36,14 @@ function handleNewChat() {
     </div>
 
     <div class="header-right">
+      <button
+        class="theme-btn"
+        :title="'主题：' + THEME_LABEL[settingsStore.settings.theme ?? 'system'] + '（点击切换）'"
+        :aria-label="'切换主题，当前' + THEME_LABEL[settingsStore.settings.theme ?? 'system']"
+        @click="cycleTheme"
+      >
+        {{ THEME_ICON[settingsStore.settings.theme ?? 'system'] }}
+      </button>
       <RouterLink
         to="/"
         class="nav-btn"
@@ -106,6 +121,23 @@ function handleNewChat() {
 
 .new-chat:hover {
   background: var(--primary-dark);
+}
+
+.theme-btn {
+  width: 32px;
+  height: 32px;
+  margin-right: 4px;
+  border-radius: var(--radius-md);
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.theme-btn:hover {
+  background: var(--border-light);
 }
 
 .nav-btn {
